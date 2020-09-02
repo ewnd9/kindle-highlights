@@ -45,6 +45,7 @@ module KindleHighlights
       mechanize_agent = Mechanize.new
       mechanize_agent.user_agent_alias = Mechanize::AGENT_ALIASES.keys.grep(/\A(Linux|Mac|Windows)/).sample
       mechanize_agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      mechanize_agent.user_agent_alias = 'Mac Safari'
 
       mechanize_options.each do |mech_attr, value|
         mechanize_agent.send("#{mech_attr}=", value)
@@ -63,7 +64,10 @@ module KindleHighlights
     end
 
     def conditionally_sign_in_to_amazon
-      if login?
+      if File.exist?("cookies.yaml")
+        mechanize_agent.cookie_jar.load("cookies.yaml")
+        @kindle_logged_in_page = mechanize_agent.get(@kindle_login_page)
+      elsif login?
         post_signin_page = login_via_mechanize
 
         if post_signin_page.search("#auth-captcha-image").any?
@@ -74,6 +78,7 @@ module KindleHighlights
           raise AuthenticationError, "Unable to sign in, received error: '#{amazon_error}'"
         else
           @kindle_logged_in_page = post_signin_page
+          mechanize_agent.cookie_jar.save("cookies.yaml", session: true)
         end
       end
     rescue AuthenticationError
